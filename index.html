@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<style>
+		#forecast {
+
+		}
+		</style>
+		<title>Bluewolf Weather App</title>
+		<meta charset="utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" >
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+		<link rel="stylesheet" href="css/style.css">
+		<script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
+		<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+		<script src='https://darkskyapp.github.io/skycons/skycons.js'></script>
+	</head>
+
+
+	<body>
+		<div class="container">
+			<h1>SkyCast Weather</h1>
+			<form class="form" id="mainForm">
+				<fieldset>
+					<div class="form-group">
+						<label for="locationName">Location</label>
+						<div class="input-group" id="cityGroup">
+							<input type="text" class="form-control" id="cityName" placeholder="e.g. Atlanta, Ga" required>
+							<div class="input-group-btn">
+			 					<button type="button" class="btn btn-default dropdown-toggle" id="historyDropdown" data-toggle="dropdown">Recents<span class="caret"></span></button>
+								<ul class="dropdown-menu dropdown-menu-right">
+								</ul>
+							</div>
+						</div>
+					</div>
+					<div class="row">
+						<div class="form-group col-xs-6">
+							<label for="latitude">Latitude</label>
+							<input type="text" class="form-control" id="latitude" placeholder="e.g. 33.7489954" required>
+						</div>
+						<div class="form-group col-xs-6">
+							<label for="longitude">Longitude</label>
+							<input type="text" class="form-control" id="longitude" placeholder="e.g. -84.3879824" required>
+						</div>
+					</div>
+				</fieldset>
+				<button class="btn btn-default col-xs-12" id="submit">Submit</button>
+			</form>
+			<form class="form" id="forecast" hidden>
+				<h3 id="locationTitle"></h3>
+				<div class="row">
+					<div class="form-group col-xs-4" id="forecastDate">
+					</div>
+					<div class="form-group col-xs-8" id="forecastData">
+						<div class="row" id="rowHigh">
+						</div>
+						<div class="row" id="rowLow">
+						</div>
+					</div>
+				</div>
+				<div class="form-group" id="hourlyForecast">
+					<h4>Hourly Forecast</h4>
+					<div class='scrollHours col-xs-12'>
+						<div class='row' id="hourlyForecastRow">
+						</div>
+						<div class='row' id="conditionRow">
+						</div>
+					</div>
+				</div>
+				<div class="form-group" id="weeklyForecast">
+					<h4>Weekly Forecast</h4>
+					<div class="row">
+						<div class="form-group col-xs-4" id="dayOfWeek">
+						</div>
+						<div class="form-group col-xs-4" id="icon">
+						</div>
+						<div class="form-group col-xs-4" id="weekdayTemp">
+						</div>
+					</div>
+				</div>
+				<button class="btn btn-default col-xs-12" id="historic" data-toggle="collapse" data-target="#chartsGroup">Historic Weather Data</button>
+				<div class="collapse col-xs-12" id="chartsGroup">
+					<div class="googleChart" id="historicTempChart">
+					</div>
+					<div class="googleChart" id="historicPrecipChart">
+					</div>
+					<div class="googleChart" id="historicHumidityChart">
+					</div>
+				</div>
+			</form>
+			<div id="backDiv" hidden>
+				<button class="btn btn-default col-xs-12" id="backButton">New Forecast</button>
+			</div>
+		</div>
+
+
+		<script src="https://www.gstatic.com/firebasejs/4.4.0/firebase.js"></script>
+		<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+		<script src="js/index.js"></script>
+		<script>
+
+			var forecastPromises = [];
+			//add cookie values in to dropdown menu
+			$('.input-group-btn').on('show.bs.dropdown', function(e) {
+
+				var cookie = decodeURIComponent(document.cookie);
+				var cookieArray = cookie.split(';');
+				var dropdownValues = []; //save last 20 searches
+				var dropdownValuesLength = 20;
+
+				if(cookieArray[0] != "") {
+					for(var i =  0; i < cookieArray.length; i++) {
+						var cookieValue = cookieArray[i];
+						console.log(i);
+						console.log(cookieValue);
+						cookieValue = cookieValue.substring( cookieValue.indexOf('=') + 1 );
+						//console.log( 'indexOf = ', dropdownValues.indexOf(cookieValue) );
+
+						//ensures repeat values are not added to the list
+						if(dropdownValues.includes(cookieValue) == false ) {
+
+							//Treats dropdownValues as a queue of 20 values
+							if(dropdownValues.length == dropdownValuesLength) {
+								dropdownValues.shift();
+								dropdownValues.push(cookieValue);
+							}
+							else {
+								dropdownValues.push(cookieValue);
+							}
+
+							console.log('drop',cookieArray);
+							console.log('drop',cookieValue);
+							$('.dropdown-menu-right').prepend('<li><a href="#">' + cookieValue + '</a></li>');
+							console.log( 'clicked', cookieArray[i]);
+						}
+						else {
+
+						}
+					}
+				}
+				else {
+					$('.dropdown-menu-right').hide();
+				}
+				//console.log( 'clicked', $(this).text() );
+			});
+
+			//change input value to the value clicked in the history dropdown
+			$('.dropdown-menu-right').on('click', 'a', function(e) {
+
+				$('#cityName').val( $(this).text() );
+
+				//Gives searchBox focus to trigger 'places_changed' event
+				$('#cityName').focus();
+
+				var input = $('#cityName').get(0)
+
+				//simulates a press of the enter key to autofill the fields after selecting from recents
+				google.maps.event.trigger(input, "keydown", {keyCode: 13 });
+				autoFill();
+				console.log( 'clicked', $(this).text() );
+			});
+
+			//submit button listener
+			$('#submit').on('click', function(e) {
+
+				var lat = $('#latitude').val(),
+						long = $('#longitude').val();
+						//forecastPromises;
+
+				if(lat && long !== '') {
+					e.preventDefault();
+					getWeather(lat, long);
+				}
+				else {
+					alert("Please enter valid cooridinates")
+				}
+
+				$('#backDiv').show();
+
+				console.log( 'clicked', $( this ).text() );
+			});
+
+			//Prevents Historic Weather Data button from reloading page
+			$('#historic').on('click', function(e){
+				e.preventDefault();
+			});
+
+			$('#chartsGroup').on('show.bs.collapse', function(e) {
+
+				//e.preventDefault();
+				if( forecastPromises.length == 0 ) {
+					var lat = $('#latitude').val(),
+							long = $('#longitude').val();
+
+					forecastPromises = getPastFuture(lat, long);
+
+					console.log('before Promise');
+					//fulfilling Promise
+					processPromisesandDraw( forecastPromises );
+					console.log('inside collapse', google.visualization.dataTable);
+				}
+			});
+
+			$(document).ready(function() {
+				$('#backButton').on('click', function() {
+					//window.history.back();
+					location.reload();
+				});
+			});
+
+			$(window).resize(function() {
+				processPromisesandDraw( forecastPromises );
+			});
+
+			function autoFill() {
+
+			  var searchBox = new google.maps.places.SearchBox(document.getElementById('cityName'));
+				var numCookies;
+
+				//auto fill
+			  searchBox.addListener('places_changed', function() {
+			    var place = searchBox.getPlaces()[0];
+			    document.getElementById('latitude').value = place.geometry.location.lat();
+			    document.getElementById('longitude').value = place.geometry.location.lng();
+
+					//add location to #location header
+					$('#locationTitle').append(place.name);
+
+					if(document.cookie.split(';')[0] == "") {
+						numCookies = 0;
+					}
+					else {
+						var numCookies = document.cookie.split(';').length;
+					}
+
+					var location = 'location' + ( numCookies + 1 );
+
+					saveCookie(location, place.name, 30);
+
+			  });
+			}
+
+			//function to save cookie
+			function saveCookie(name, value, numExpDays) {
+				var date = new Date();
+				date.setTime( date.getTime() + (numExpDays*24*60*60*1000) );
+				var expires = "expires=" + date.toGMTString();
+				document.cookie = name + "=" + value + ";" + expires + ";path=/";
+			}
+
+			//function to draw google chart for historical forecast data
+			google.charts.load('current', {packages: ['corechart', 'line']});
+
+
+			function processPromisesandDraw(promises) {
+				Promise.all(forecastPromises).then(function(fulfilled) {
+					//console.log(fulfilled);
+					var temperaturePromises = [],
+							precipPromises = [],
+							humidityPromises = [];
+
+					for(var i = 0; i < fulfilled.length; i++) {
+						temperaturePromises.push( [ fulfilled[i][0], fulfilled[i][1], fulfilled[i][2] ] );
+						precipPromises.push( [ fulfilled[i][0], fulfilled[i][3] ] );
+						humidityPromises.push( [ fulfilled[i][0], fulfilled[i][4] ] );
+					}
+					//var temperaturePromises = [ fulfilled[0], fulfilled[1], fulfilled[2] ];
+					//console.log(temperaturePromises);
+					drawTemperatureChart( temperaturePromises );
+					drawPrecipChart( precipPromises );
+					drawHumidityChart( humidityPromises );
+				})
+				.catch(function (eror) {
+					console.log(error.message);
+				});
+			}
+
+
+			function drawTemperatureChart(forecasts) {
+				var data = new google.visualization.DataTable();
+				data.addColumn('number', 'Year');
+				data.addColumn('number', 'High Temp');
+				data.addColumn('number', 'Low Temp');
+
+				//console.log(forecasts);
+				data.addRows(forecasts);
+				data.sort([{column: 0}]);
+
+				//set axis
+				var options = {
+					title: 'Historic Temperatures',
+					hAxis: { title: 'Year'},
+					vAxis: { title: 'Temperature' },
+					series: { 1: { curveType: 'function' } },
+					colors: ['red', 'blue'],
+
+					legend: {position: 'bottom'}
+				}
+
+				//draw chart
+				var chart = new google.visualization.LineChart( document.getElementById('historicTempChart') );
+				chart.draw(data, options);
+			}
+
+			function drawPrecipChart(forecasts) {
+				var data = new google.visualization.DataTable();
+				data.addColumn('number', 'Year');
+				data.addColumn('number', 'Precip Probability');
+
+				//console.log(forecasts);
+				data.addRows(forecasts);
+				data.sort([{column: 0}]);
+
+				//set axis
+				var options = {
+					title: 'Historic Precipitation Probability',
+					hAxis: { title: 'Year'},
+					vAxis: { title: 'Precip Probability' },
+					series: { 1: { curveType: 'function' } },
+					legend: {position: 'bottom'}
+				}
+
+				//draw chart
+				var chart = new google.visualization.LineChart( document.getElementById('historicPrecipChart') );
+				chart.draw(data, options);
+			}
+
+			function drawHumidityChart(forecasts) {
+				var data = new google.visualization.DataTable();
+				data.addColumn('number', 'Year');
+				data.addColumn('number', 'Humidity');
+
+				//console.log(forecasts);
+				data.addRows(forecasts);
+				data.sort([{column: 0}]);
+
+				//set axis
+				var options = {
+					title: 'Historic Humidity',
+					hAxis: { title: 'Year'},
+					vAxis: { title: 'Humidity' },
+					series: { 1: { curveType: 'function' } },
+					legend: {position: 'bottom'}
+				}
+
+				//draw chart
+				var chart = new google.visualization.LineChart( document.getElementById('historicHumidityChart') );
+				chart.draw(data, options);
+			}
+		</script>
+		<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAKbYTvZq2ywrElGBUKk-t-y7tmw6r7edk&libraries=places,geometry&callback=autoFill"></script>
+	</body>
+</html>

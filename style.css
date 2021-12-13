@@ -1,0 +1,43 @@
+#hourlyForecastRow {
+  white-space: nowrap;
+  margin: 0;
+}
+
+#conditionRow {
+  white-space: nowrap;
+  margin: 0;
+}
+#hourlyTemp {
+  width: 50%;
+  margin: 0 auto;
+}
+
+#hourlyCondition {
+  /*padding-right: 15px;
+  padding-left: 7.5px; */
+  width: 50%;
+  margin: 0 auto;
+
+
+}
+
+.scrollHours {
+  overflow: auto;
+  white-space: nowrap;
+  padding: 0;
+  margin-bottom: 15px;
+
+}
+
+.hourlyGroup {
+  display: inline-block;
+  padding-right: 15px;
+}
+
+.googleChart {
+  width: 100%;
+}
+
+#mainForm {
+
+}
